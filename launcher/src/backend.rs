@@ -4587,7 +4587,7 @@ mod tests {
         )
         .unwrap_err();
         // Ordinary prepare appends the refusal to the missing-Minecraft diagnostic.
-        let diagnostic = sources::not_found(&pins.version, &[], &dir) + &refused;
+        let diagnostic = sources::not_found(&pins.version, &[], Path::new("chosen")) + &refused;
         let (_, remedies) = diagnostic.split_once("\nTo fix it:").unwrap();
         assert_eq!(
             remedies,

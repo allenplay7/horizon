@@ -175,6 +175,7 @@ jobs:
       # the cached commit, and clippy re-checks only those crates and what depends on them. Without a usable
       # .ci-built/sha the script does nothing and clippy checks everything, as before.
       - name: Date unchanged files as the cache saw them
+        id: pin-lint-mtimes
         if: >-
           github.event_name == 'pull_request' && github.event_name != 'merge_group' && steps.rust.outputs.required != 'false' &&
           runner.environment == 'github-hosted'
@@ -220,6 +221,13 @@ jobs:
           else
             python3 tools/ci/rust_changes.py --launcher "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
           fi
+      # The launcher cache can be older than the game lint cache. Restore fresh timestamps so Cargo rebuilds
+      # path dependencies that game lint treated as unchanged.
+      - name: Restore source timestamps for the launcher
+        if: steps.pin-lint-mtimes.outcome == 'success' && steps.launcher.outputs.required != 'false'
+        run: |
+          find . \( -path ./.git -o -path ./target -o -path ./.ci-built -o -path ./launcher/target \) -prune -o \
+            -exec touch -h {} +
       - name: Install Rust and the headers GPUI links against
         if: github.event_name != 'merge_group' && steps.launcher.outputs.required != 'false'
         env:

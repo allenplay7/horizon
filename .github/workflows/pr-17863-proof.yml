@@ -1,0 +1,57 @@
+name: PR 17863 Windows relocation proof
+on:
+  push:
+    branches: ['proof/pr-17863-windows-97cc1f0']
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 110
+    env:
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_INCREMENTAL: '0'
+      HORIZON_TELEMETRY_URL: 'off'
+      HORIZON_NO_AUDIO: '1'
+      HORIZON_LAUNCHER_NO_SELF_UPDATE: '1'
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          sparse-checkout: proof
+          path: harness
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 97cc1f0c0adc5f2425eb3209592eb63ade9d8417
+          persist-credentials: false
+          path: candidate
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec
+        with:
+          toolchain: stable
+      - name: Verify exact PR source and isolate launcher data
+        shell: pwsh
+        run: |
+          if ((git -C candidate rev-parse HEAD) -ne '97cc1f0c0adc5f2425eb3209592eb63ade9d8417') { throw 'Unexpected checkout' }
+          git -C candidate show -s --format='%H %T %P'
+          $scratch = Join-Path $env:RUNNER_TEMP 'horizon-proof-tests'
+          New-Item -ItemType Directory -Path $scratch -ErrorAction Stop | Out-Null
+          foreach ($pair in @{
+            HORIZON_LAUNCHER_HOME='launcher'; HORIZON_HOME='game'; HORIZON_LAUNCHER_LOCATION_FILE='location.json';
+            XDG_CONFIG_HOME='config'; XDG_DATA_HOME='data'; HORIZON_LAUNCHER_TRASH='trash';
+            HORIZON_LAUNCHER_CLIPBOARD='clipboard'; HORIZON_LAUNCHER_DESKTOP='desktop'
+          }.GetEnumerator()) { "$($pair.Key)=$(Join-Path $scratch $pair.Value)" >> $env:GITHUB_ENV }
+      - name: Run Windows data-location tests
+        working-directory: candidate/launcher
+        run: cargo test --locked --lib data_location::tests:: -- --nocapture
+      - name: Build the production worker
+        working-directory: candidate/launcher
+        run: cargo build --locked --bin horizon-launcher
+      - name: Move managed toolchain using production worker and verify original files
+        run: python -u harness/proof/windows_move.py candidate/launcher/target/debug/horizon-launcher.exe
+      - name: Run full native launcher suite including integration tests
+        if: success() || failure()
+        working-directory: candidate/launcher
+        run: cargo test --locked

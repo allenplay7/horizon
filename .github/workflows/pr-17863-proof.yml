@@ -45,7 +45,8 @@ jobs:
           }.GetEnumerator()) { "$($pair.Key)=$(Join-Path $scratch $pair.Value)" >> $env:GITHUB_ENV }
       - name: Run Windows data-location tests
         working-directory: candidate/launcher
-        run: cargo test --locked --lib data_location::tests:: -- --nocapture
+        run: |
+          cargo test --locked --lib data_location::tests:: -- --nocapture
       - name: Build the production worker
         working-directory: candidate/launcher
         run: cargo build --locked --bin horizon-launcher

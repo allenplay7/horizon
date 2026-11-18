@@ -82,5 +82,6 @@ jobs:
       - name: Repository self-check against the rebased parent
         run: |
           test "$(git rev-parse HEAD)" = "97cc1f0c0adc5f2425eb3209592eb63ade9d8417"
-          python3 -u tools/pr_ready.py --base 8989a510ff75beb69cd2962b6bb6e0d31f3cc962 --verbose | tee "$RUNNER_TEMP/pr-ready.log"
+          # Reproduce the documented contributor command outside GitHub's fork-specific environment.
+          env -u GITHUB_REPOSITORY python3 -u tools/pr_ready.py --base 8989a510ff75beb69cd2962b6bb6e0d31f3cc962 --verbose | tee "$RUNNER_TEMP/pr-ready.log"
         shell: bash

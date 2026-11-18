@@ -6,6 +6,7 @@ permissions:
   contents: read
 jobs:
   windows:
+    if: ${{ !startsWith(github.event.head_commit.message, 'test(proof-linux)') }}
     runs-on: windows-latest
     timeout-minutes: 110
     env:
@@ -56,3 +57,30 @@ jobs:
         if: success() || failure()
         working-directory: candidate/launcher
         run: cargo test --locked
+  pr-ready:
+    if: startsWith(github.event.head_commit.message, 'test(proof-linux)')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: '0'
+      CARGO_PROFILE_TEST_DEBUG: '0'
+      CARGO_PROFILE_DEV_DEBUG: '0'
+      WGPU_BACKEND: dx12
+      HORIZON_TELEMETRY_URL: 'off'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 97cc1f0c0adc5f2425eb3209592eb63ade9d8417
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Install launcher dependencies
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y --no-install-recommends libxkbcommon-x11-dev libwayland-dev libx11-xcb-dev libfontconfig-dev libvulkan-dev libasound2-dev libudev-dev mold
+          rustup toolchain install stable --profile minimal --component rustfmt --component clippy
+          rustup default stable
+      - name: Repository self-check against the rebased parent
+        run: |
+          test "$(git rev-parse HEAD)" = "97cc1f0c0adc5f2425eb3209592eb63ade9d8417"
+          python3 -u tools/pr_ready.py --base 8989a510ff75beb69cd2962b6bb6e0d31f3cc962 --verbose | tee "$RUNNER_TEMP/pr-ready.log"
+        shell: bash
